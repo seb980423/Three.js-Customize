@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js glTF Loader</title>
+    <style>
+        body { margin: 0; background: #cccccc;}
+        canvas { display: block; }
+
+        /* 버튼 스타일 정의 */
+        #customizeButton, #saveButton, #imageButton, #resetButton {
+            position: absolute;
+            top: 20px;
+            padding: 10px 20px;
+            background-color: #000000;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 1000;
+        }
+        #customizeButton { left: 20px; }
+        #saveButton { left: 150px; }
+        #imageButton { left: 265px; }
+        #resetButton { left: 395px;}
+        #customizeButton:hover, #saveButton:hover, #imageButton:hover {
+            background-color: hsl(0, 62%, 43%);
+        }
+
+        /* 색상 선택 스타일 정의 */
+        #colorPickerContainer {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: none;
+            z-index: 1000;
+        }
+
+        #fileInput {
+            display: none;
+        }
+        
+        /* 라디오 버튼 스타일 */
+        #modelSelectContainer {
+            position: absolute;
+            top: 18.5px;
+            left: 490px;
+            background-color: black;
+            padding: 8.4px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            color: white;
+            z-index: 1000;
+        }
+
+        #moveControls {
+            position: relative;
+            top: 10px;
+            left: 1750px;
+            width: 150px;
+            height: 150px;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            background-color: #000000;
+            display: block;
+            z-index: 1000;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            align-items: center;
+            justify-content: center;
+            padding:0;
+            margin-top: 0;
+        }
+
+        #moveButtonControl {
+            width: 30px;
+            height: 30px;
+            background-color: #007BFF;
+            border-radius: 50%;
+            cursor: pointer;
+            position: absolute;
+            top: 60px;
+            left: 60px;
+        }
+    </style>
+</head>
+<body>
+    <button id="customizeButton">Customize</button>
+    <button id="saveButton">Save file</button>
+    <button id="imageButton">Add Image</button>
+    <button id="resetButton">Reset</button>
+    <input type="file" id="fileInput" accept="image/*">
+
+    <div id="colorPickerContainer">
+        <label for="colorPicker">Choose color:</label>
+        <input type="color" id="colorPicker" value="#ffffff">
+    </div>
+
+    <div id="moveControls">
+        <div id="moveButtonControl"></div>
+    </div>
+
+    <!-- 라디오 버튼으로 모델 선택 -->
+    <div id="modelSelectContainer">
+        <label>
+            <input type="radio" name="modelSelect" value="model1" checked> Model 1
+        </label>
+        <label>
+            <input type="radio" name="modelSelect" value="model2"> Model 2
+        </label>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+    <script>
+        let scene, camera, renderer, model, model2, controls;
+        let loadedTexture = null;
+        let mouseX = 0, mouseY = 0;
+        const windowHalfX = window.innerWidth / 2;
+        const windowHalfY = window.innerHeight / 2;
+        let initialPosition1, initialPosition2;
+        let selectedModel = 'model1';  // 기본 선택은 모델 1
+        let moveButtonControl = document.getElementById('moveButtonControl');
+        let moveControls = document.getElementById('moveControls');
+        let isDragging = false;
+        let currentTexture1 = null; // model1의 현재 텍스처 저장   
+        let currentTexture2 = null; // model2의 현재 텍스처 저장
+        let currentTextureOffset = { x: 0, y: 0 }; // 현재 텍스처 오프셋 저장
+
+        
+        // 마우스 이동 이벤트 리스너
+        document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+        function onDocumentMouseMove(event) {
+            // 마우스 위치를 캡처 (중앙을 기준으로 X, Y 좌표 계산)
+            mouseX = (event.clientX - windowHalfX) / windowHalfX;
+            mouseY = (event.clientY - windowHalfY) / windowHalfY;
+        }
+
+        document.getElementById('customizeButton').addEventListener('click', function() {
+            const colorPickerContainer = document.getElementById('colorPickerContainer');
+            colorPickerContainer.style.display = colorPickerContainer.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.getElementById('colorPicker').addEventListener('input', function(event) {
+            const targetModel = selectedModel === 'model1' ? model : model2;
+            if (targetModel) {
+                targetModel.traverse(function(child) {
+                    if (child.isMesh) {
+                        child.material.color.set(event.target.value);
+                        child.material.needsUpdate = true;
+                    }
+                });
+            }
+        });
+
+        document.getElementById('resetButton').addEventListener('click', function() {
+            const targetModel = selectedModel === 'model1' ? model : model2;
+            if (targetModel) {
+                targetModel.traverse(function(child) {
+                    if (child.isMesh) {
+                        child.material.color.set(0xffffff);
+                        child.material.map = null;
+                        child.material.needsUpdate = true;
+                    }
+                });
+            }
+        });
+
+        document.getElementById('saveButton').addEventListener('click', function() {
+            renderer.render(scene, camera);
+            const imgData = renderer.domElement.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = imgData;
+            link.download = 'screenshot.png';
+            link.click();
+        });
+
+        document.getElementById('imageButton').addEventListener('click', function() {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.src = e.target.result;
+
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const originalImageWidth = img.width;
+                const originalImageHeight = img.height;
+                const padding = 200;
+                const newImageWidth = originalImageWidth / 4;
+                const newImageHeight = originalImageHeight / 4;
+
+                canvas.width = newImageWidth + padding * 2;
+                canvas.height = newImageHeight + padding * 2;
+
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                ctx.translate(padding + newImageWidth / 2, padding + newImageHeight / 2);
+                ctx.rotate(Math.PI);
+                ctx.drawImage(img, -newImageWidth / 2, -newImageHeight / 2, newImageWidth, newImageHeight);
+                ctx.restore();
+
+                const dataURL = canvas.toDataURL('image/png');
+
+                // 선택된 모델에 이미지 추가
+                const targetModel = selectedModel === 'model1' ? model : model2;
+
+                if (targetModel) {
+                    const textureLoader = new THREE.TextureLoader();
+                    textureLoader.load(dataURL, function(texture) {
+                        texture.wrapS = THREE.ClampToEdgeWrapping;
+                        texture.wrapT = THREE.ClampToEdgeWrapping;
+                        texture.needsUpdate = true;
+
+                        targetModel.traverse(function(child) {
+                            if (child.isMesh) {
+                                const newMaterial = new THREE.MeshStandardMaterial({
+                                    map: texture,
+                                    color: child.material.color,
+                                    roughness: 0.8,
+                                    metalness: 0.1,
+                                });
+
+                                child.material = newMaterial;
+                                child.material.needsUpdate = true;
+
+                                // 현재 텍스처 저장
+                                if (selectedModel === 'model1') {
+                                    currentTexture1 = texture; // model1에 대해 텍스처 저장
+                                } 
+                                else if(selectedModel === 'model2') {
+                                    currentTexture2 = texture; // model2에 대해 텍스처 저장
+                                }
+                            }
+                        });
+                    });
+                }
+            };
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+        // 라디오 버튼 선택에 따른 모델 선택 변경
+        document.querySelectorAll('input[name="modelSelect"]').forEach((radio) => {
+            radio.addEventListener('change', function(event) {
+                selectedModel = event.target.value;  // 선택된 모델 업데이트
+            });
+        });
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xcccccc);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 4);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+            light.position.set(0, 20, 0);
+            scene.add(light);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff);
+            directionalLight.position.set(0, 20, 10);
+            scene.add(directionalLight);
+
+            // 첫 번째 모델 로드
+            const loader = new THREE.GLTFLoader();
+            loader.load('t_shirt/scene2.glb', function (gltf) {
+                model = gltf.scene;
+                model.scale.set(6, 6, 6);
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                model.position.sub(center);
+                model.position.x = -2.5;
+                scene.add(model);
+            }, undefined, function (error) {
+                console.error(error);
+            });
+            // 두 번째 모델 로드
+            const loader2 = new THREE.GLTFLoader();
+            loader.load('t_shirt/scene4.glb', function (gltf) {
+                model2 = gltf.scene;
+                model2.scale.set(6, 6, 6);
+                const box = new THREE.Box3().setFromObject(model2);
+                const center = box.getCenter(new THREE.Vector3());
+                model2.position.sub(center); 
+                model2.position.x = 2.5;
+                model2.position.z = 0; // 모델의 z축 위치 기본값으로 유지해야함!
+                model2.rotation.y = Math.PI; // !!!y축 기준으로 180도 회전시켜서 뒷면 보이게함!!!
+                scene.add(model2);
+            }, undefined, function (error) {
+                console.error(error);
+            });
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableRotate = false;  // 카메라 회전 금지
+            controls.enableZoom = false;    // 줌 금지
+            controls.enablePan = false;     // 팬(이동) 금지
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            controls.screenSpacePanning = false;
+            controls.maxPolarAngle = Math.PI / 2;
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 마우스에 따라 선택된 모델 회전
+            const targetModel = selectedModel === 'model1' ? model : model2;
+            if (targetModel) {
+                if (selectedModel === 'model2') {
+                    targetModel.rotation.y = Math.PI + (mouseX * Math.PI / 10); //y축
+                    targetModel.rotation.x = -mouseY * Math.PI / 10; //x축
+                } else {
+                    targetModel.rotation.y = mouseX * Math.PI / 10;  // Y축 회전
+                    targetModel.rotation.x = -mouseY * Math.PI / 10; // X축 회전
+                }
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate();
+
+        moveButtonControl.addEventListener('mousedown', function(event) {
+        isDragging = true;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    function onMouseMove(event) {
+    if (isDragging) {
+        const moveControlsRect = moveControls.getBoundingClientRect();
+        const x = event.clientX - moveControlsRect.left - moveButtonControl.clientWidth / 2;
+        const y = event.clientY - moveControlsRect.top - moveButtonControl.clientHeight / 2;
+        moveButtonControl.style.left = Math.max(0, Math.min(moveControlsRect.width - moveButtonControl.clientWidth, x)) + 'px';
+        moveButtonControl.style.top = Math.max(0, Math.min(moveControlsRect.height - moveButtonControl.clientHeight, y)) + 'px';
+
+        const centerX = moveControlsRect.width / 2;
+        const centerY = moveControlsRect.height / 2;
+        const offsetX = (x - centerX) / centerX;
+        const offsetY = (y - centerY) / centerY;
+
+        if (selectedModel === 'model1') {
+            currentTextureOffset.x = offsetX * 2; // 스케일 조정
+            currentTextureOffset.y = offsetY * 2; // 스케일 조정
+            currentTexture1.offset.x = currentTextureOffset.x;
+            currentTexture1.offset.y = currentTextureOffset.y;
+            currentTexture1.needsUpdate = true;
+        }
+        else if(selectedModel === 'model2'){
+            currentTextureOffset.x = offsetX * 2; // 스케일 조정
+            currentTextureOffset.y = offsetY * 2; // 스케일 조정
+            currentTexture2.offset.x = currentTextureOffset.x;
+            currentTexture2.offset.y = currentTextureOffset.y;
+            currentTexture2.needsUpdate = true;
+        }
+    }
+}
+
+function onMouseUp() {
+    isDragging = false;
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+
+    // 드래그를 멈추면 버튼을 원래 위치로 복원
+    moveButtonControl.style.left = '60px'; // 초기 위치로 설정
+    moveButtonControl.style.top = '60px';  // 초기 위치로 설정
+
+    // 버튼 색상 복원
+    moveButtonControl.style.backgroundColor = '#007BFF';
+}
+
+    </script>
+</body>
+</html>

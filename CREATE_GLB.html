@@ -1,0 +1,916 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Three.js glTF Loader</title>
+        <style>
+            body { margin: 0; background: #cccccc;}
+            canvas { display: block; }
+
+            /* 버튼 스타일 정의 */
+            #customizeButton, #saveButton, #imageButton, #resetButton, #loadButton, #draftsSaveButton, #draftsLoadButton{
+                position: absolute;
+                top: 20px;
+                padding: 5px 20px;
+                background-color: #000000;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                z-index: 1000;
+            }
+
+            #languageToggleButton {
+                position: absolute;
+                top: 20px;
+                padding: 5px 8px;
+                background-color: #000000;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                z-index: 1000;
+            }
+
+            #customizeButton { left: 20px; }
+            #saveButton { left: 130px; }
+            #imageButton { left: 240px; }
+            #resetButton { left: 360px; }
+            #loadButton { left: 475px; }
+            #languageToggleButton {left: 580px;}
+            #draftsSaveButton {left: 630px;}
+            #draftsLoadButton {left: 760px;}
+            #customizeButton:hover, #saveButton:hover, #imageButton:hover #loadButton:hover #draftsSaveButton:hover #draftsLoadButton:hover {
+                background-color: hsl(0, 62%, 43%);
+            }
+            #materialPickerContainer { top: 120px; }
+            /* 색상 선택 스타일 정의 */
+            #colorPickerContainer, #materialPickerContainer {
+                position: absolute;
+                top: 60px;
+                left: 20px;
+                padding: 10px;
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                display: none;
+                z-index: 1000;
+            }
+            #materialPickerContainer {
+                position: absolute;
+                top: 120px;
+                left: 20px;
+                padding: 10px;
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                display: none;
+                z-index: 1000;
+            }
+
+
+            #fileInput {
+                display: none;
+            }
+            
+            #moveControls {
+                position: fixed; /* 변경 */
+                top: 10px; /* 상단 여백 */
+                right: 10px; /* 오른쪽 여백 */
+                width: 150px;
+                height: 150px;
+                border: 1px solid #ccc;
+                border-radius: 50%;
+                background-color: #000000;
+                display: block;
+                z-index: 1000;
+                overflow: hidden;
+                box-shadow: 0 0 10px rgba(0,0,0,0.3);
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                margin-top: 0;
+            }
+
+            #moveButtonControl {
+                width: 30px;
+                height: 30px;
+                background-color: #007BFF;
+                border-radius: 50%;
+                cursor: pointer;
+                position: absolute;
+                top: 60px;
+                left: 60px;
+            }
+
+            /* 라디오 버튼 스타일 */
+            #modelSelectContainer {
+                position: absolute;
+                top: 20px;
+                left: 1350px;
+                background-color: black;
+                padding: 4px;
+                border-radius: 5px;
+                border: 1px solid black;
+                color: white;
+                z-index: 1000;
+            }
+
+        </style>
+    </head>
+    <body>
+        <button id="customizeButton">Color 🎨</button>
+        <button id="saveButton">Save 💾</button>
+        <button id="imageButton">Image 🖼️</button>
+        <button id="resetButton">Reset 🔄</button>
+        <button id="loadButton">Load 📁</button>
+        <button id="languageToggleButton">ⓐ</button>
+        <button id="draftsSaveButton">drafts Save</button>
+        <button id="draftsLoadButton">drafts Load</button>
+        </button>
+
+        <input type="file" id="fileInput" accept="image/*">
+        <input type="file" id="gltfInput" accept=".gltf" style="display: none;">
+        <input type="file" id="glbInput" accept=".glb" style="display: none;">
+
+        <div id="colorPickerContainer">
+            <label for="colorPicker">Choose color:</label>
+            <input type="color" id="colorPicker" value="#ffffff">
+        </div>
+    <!-- 재질 선택 드롭다운 -->
+    <div id="materialPickerContainer">
+        <label for="materialPicker">Choose material:</label>
+        <select id="materialPicker">
+            <option value="cotton">Cotton</option>
+            <option value="polyester">Polyester</option>
+            <option value="wool">Wool</option>
+            <option value="linen">Linen</option>
+            <option value="denim">Denim</option>
+            <option value="nylon">Nylon</option>
+        </select>
+    </div>
+        <div id="moveControls">
+            <div id="moveButtonControl"></div>
+        </div>
+
+        <!-- 라디오 버튼으로 모델 선택 -->
+        <div id="modelSelectContainer">
+            <label>
+                <input type="radio" name="modelSelect" value="model1" checked> Model 1
+            </label>
+            <label>
+                <input type="radio" name="modelSelect" value="model2"> Model 2
+            </label>
+        </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/exporters/GLTFExporter.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js"></script>
+        
+        <script>
+            let scene, camera, renderer, model, model2, controls;
+            let loadedTexture = null;
+            let mouseX = 0, mouseY = 0;
+            let initialPosition1, initialPosition2;
+            let selectedModel = 'model1';  // 기본 선택은 모델 1
+            let moveButtonControl = document.getElementById('moveButtonControl');
+            let moveControls = document.getElementById('moveControls');
+            let isDragging = false;
+            let currentTexture1 = null; // 모델1 저장
+            let currentTexture2 = null; // 모델2 저장
+            let currentTextureOffset = { x: 0, y: 0 }; // 현재 오프셋 저장
+            let initialOffset = { x: 0, y: 0 }; 
+            let initialButtonPosition = { left: 60, top: 60 };
+            // 새로운 버튼과 텍스트에 대한 변수
+            let languageToggleButton = document.getElementById('languageToggleButton');
+            let isKorean = false;  // 현재 상태가 영어인지를 추적하는 변수
+            const windowHalfX = window.innerWidth / 2;
+            const windowHalfY = window.innerHeight / 2;
+
+            document.getElementById('customizeButton').addEventListener('click', function() {
+                const colorPickerContainer = document.getElementById('colorPickerContainer');
+                const materialPickerContainer = document.getElementById('materialPickerContainer'); 
+                colorPickerContainer.style.display = colorPickerContainer.style.display === 'none' ? 'block' : 'none';
+                materialPickerContainer.style.display = materialPickerContainer.style.display === 'none' ? 'block' : 'none'; 
+            });
+
+            document.getElementById('colorPicker').addEventListener('input', function(event) {
+                const colorValue = event.target.value;
+                
+                // model과 model2에 대해 모두 색상 설정
+                [model, model2].forEach(targetModel => {
+                    if (targetModel) {
+                        targetModel.traverse(function(child) {
+                            if (child.isMesh) {
+                                child.material.color.set(colorValue);
+                                child.material.needsUpdate = true;
+                            }
+                        });
+                    }
+                });
+            });
+            document.getElementById('materialPicker').addEventListener('change', function(event) {
+        // 첫 번째 모델에 대한 재질 변경
+        if (model) {
+            model.traverse(function(child) {
+                if (child.isMesh) {
+                    // 기존 재질을 복사
+                    const existingMaterial = child.material;
+
+                    // 선택한 재질에 맞는 새로운 재질 생성
+                    const newMaterial = new THREE.MeshStandardMaterial({
+                        color: existingMaterial.color,
+                        map: existingMaterial.map,  // 기존 텍스처 유지
+                        roughness: 0.5,
+                        metalness: 0.5
+                    });
+
+                    // 선택된 재질에 따라 roughness와 metalness 조정
+                    switch (event.target.value) {
+                        case 'cotton':
+                            newMaterial.roughness = 0.8;
+                            newMaterial.metalness = 0.1;
+                            break;
+                        case 'polyester':
+                            newMaterial.roughness = 0.5;
+                            newMaterial.metalness = 0.3;
+                            break;
+                        case 'wool':
+                            newMaterial.roughness = 1.0;
+                            newMaterial.metalness = 0.1;
+                            break;
+                        case 'linen':
+                            newMaterial.roughness = 0.7;
+                            newMaterial.metalness = 0.1;
+                            break;
+                        case 'denim':
+                            newMaterial.roughness = 0.6;
+                            newMaterial.metalness = 0.2;
+                            break;
+                        case 'nylon':
+                            newMaterial.roughness = 0.2;
+                            newMaterial.metalness = 0.3;
+                            break;
+                    }
+
+                    // 새로운 재질을 모델에 적용
+                    child.material = newMaterial;
+                    child.material.needsUpdate = true; // 재질 업데이트
+                }
+            });
+        }
+
+        // 두 번째 모델에 대한 재질 변경
+        if (model2) {
+            model2.traverse(function(child) {
+                if (child.isMesh) {
+                    // 기존 재질을 복사
+                    const existingMaterial = child.material;
+
+                    // 선택한 재질에 맞는 새로운 재질 생성
+                    const newMaterial = new THREE.MeshStandardMaterial({
+                        color: existingMaterial.color,
+                        map: existingMaterial.map,  // 기존 텍스처 유지
+                        roughness: 0.5,
+                        metalness: 0.5
+                    });
+
+                    // 선택된 재질에 따라 roughness와 metalness 조정
+                    switch (event.target.value) {
+                        case 'cotton':
+                                newMaterial.roughness = 0.8;
+                                newMaterial.metalness = 0.0;
+                                break;
+                            case 'polyester':
+                                newMaterial.roughness = 0.3;
+                                newMaterial.metalness = 0.1;
+                                break;
+                            case 'wool':
+                                newMaterial.roughness = 0.9;
+                                newMaterial.metalness = 0.0;
+                                break;
+                            case 'silk':
+                                newMaterial.roughness = 0.1;
+                                newMaterial.metalness = 0.2;
+                                break;
+                            case 'denim':
+                                newMaterial.roughness = 0.6;
+                                newMaterial.metalness = 0.0;
+                                break;
+                            case 'linen':
+                                newMaterial.roughness = 0.7;
+                                newMaterial.metalness = 0.0;
+                                break;
+                            case 'nylon':
+                                newMaterial.roughness = 0.2;
+                                newMaterial.metalness = 0.1;
+                                break;
+                    }
+
+                    // 새로운 재질을 모델에 적용
+                    child.material = newMaterial;
+                    child.material.needsUpdate = true; // 재질 업데이트
+                }
+            });
+        }
+    });
+            document.getElementById('saveButton').addEventListener('click', function() {
+                saveAsPNG();
+                saveModelToCookie();
+            });
+
+            function saveAsPNG(){
+                renderer.render(scene, camera);
+                
+                // Three.js 캔버스에서 이미지를 얻음
+                const imgData = renderer.domElement.toDataURL('image/png');
+
+                // 새로운 캔버스를 생성하고 이미지를 그릴 준비
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const img = new Image();
+                img.src = imgData;
+                
+                img.onload = function() {
+                    canvas.width = img.width;  
+                    canvas.height = img.height;
+
+                    // 캔버스에 원본 이미지 그리기
+                    ctx.drawImage(img, 0, 0);
+
+                    // 워터마크 이미지 로드
+                    const watermark = new Image();
+                    watermark.src = 'custy.png';  // 워터마크 이미지 파일 경로
+                    
+                    watermark.onload = function() {
+                        const wmWidth = 200;  // 워터마크 이미지 너비
+                        const wmHeight = 50;  // 워터마크 이미지 높이
+                        const spacing = 100;  // 워터마크 간격 (워터마크끼리의 간격)
+                        ctx.globalAlpha = 0.2;  // 워터마크 투명도 설정
+
+                        // 대각선으로 반복적인 워터마크 배치
+                        for (let y = -wmHeight; y < canvas.height; y += wmHeight + spacing) {
+                            for (let x = y - 3000; x < canvas.width; x += wmWidth + spacing) { // X 좌표를 왼쪽으로 많이 옮김 (-400)
+                                ctx.save();
+                                ctx.translate(x + wmWidth / 2, y + wmHeight / 2);
+                                ctx.rotate(-Math.PI / 4);  // 대각선 회전
+                                ctx.drawImage(watermark, -wmWidth / 2, -wmHeight / 2, wmWidth, wmHeight);
+                                ctx.restore();
+                            }
+                        }
+
+                        // 최종 이미지를 다운로드
+                        const finalImage = canvas.toDataURL('image/png');
+                        const link = document.createElement('a');
+                        link.href = finalImage;
+                        link.download = 'screenshot_with_watermark.png';
+                        link.click();
+                    };
+                };
+            }
+
+            document.getElementById('imageButton').addEventListener('click', function() {
+                document.getElementById('fileInput').click();
+            });
+
+            document.getElementById('fileInput').addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image();
+                        img.src = e.target.result;
+
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+
+                            const originalImageWidth = img.width;
+                            const originalImageHeight = img.height;
+                            const padding = 200;
+                            const newImageWidth = originalImageWidth / 6;
+                            const newImageHeight = originalImageHeight / 6;
+
+                            canvas.width = newImageWidth + padding * 2;
+                            canvas.height = newImageHeight + padding * 2;
+
+                            ctx.fillStyle = 'white';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                            ctx.save();
+                            ctx.translate(padding + newImageWidth / -1, padding + 125);
+                            ctx.rotate(Math.PI);
+                            ctx.drawImage(img, -newImageWidth, -newImageHeight / 1, newImageWidth, newImageHeight);
+                            ctx.restore();
+
+                            const dataURL = canvas.toDataURL('image/png');
+
+                            // 두 모델에 이미지 추가
+                            [model, model2].forEach((targetModel, index) => {
+                                if (targetModel) {
+                                    const textureLoader = new THREE.TextureLoader();
+                                    textureLoader.load(dataURL, function(texture) {
+                                        texture.wrapS = THREE.ClampToEdgeWrapping;
+                                        texture.wrapT = THREE.ClampToEdgeWrapping;
+                                        texture.needsUpdate = true;
+
+                                        targetModel.traverse(function(child) {
+                                            if (child.isMesh) {
+                                                const newMaterial = new THREE.MeshStandardMaterial({
+                                                    map: texture,
+                                                    color: child.material.color,
+                                                    roughness: 0.8,
+                                                    metalness: 0.1,
+                                                });
+
+                                                child.material = newMaterial;
+                                                child.material.needsUpdate = true;
+
+                                                // 현재 텍스처 저장
+                                                if (index === 0) {
+                                                    currentTexture1 = texture; // model1에 대해 텍스처 저장
+                                                } 
+                                                else if (index === 1) {
+                                                    currentTexture2 = texture; // model2에 대해 텍스처 저장
+                                                }
+                                            }
+                                        });
+                                    });
+                                }
+                            });
+                        };
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            document.getElementById('resetButton').addEventListener('click', function() {
+                // 두 모델을 모두 초기화하고 씬에서 제거
+                [model, model2].forEach((targetModel, index) => {
+                    if (targetModel) {
+                        // 씬에서 모델 제거
+                        scene.remove(targetModel);
+                        
+                        // 모델을 다시 로드
+                        const loader = new THREE.GLTFLoader();
+                        const modelPath = index === 0 ? 't_shirt/scene2.glb' : 't_shirt/scene4.glb'; // index로 모델 경로 선택
+                        
+                        loader.load(modelPath, function (gltf) {
+                            const newModel = gltf.scene;
+                            newModel.scale.set(6, 6, 6);
+                            const box = new THREE.Box3().setFromObject(newModel);
+                            const center = box.getCenter(new THREE.Vector3());
+                            newModel.position.sub(center);
+                            newModel.position.x = index === 0 ? -2.5 : 2.5; // 위치 설정
+                            newModel.position.y = 0;
+                            if (index === 1) {
+                                newModel.rotation.y = Math.PI; // 모델 2는 y축 회전
+                            }
+                            scene.add(newModel);
+                            
+                            // 기존 모델 참조 업데이트
+                            if (index === 0) {
+                                model = newModel; // model1 업데이트
+                            } else {
+                                model2 = newModel; // model2 업데이트
+                            }
+                        }, undefined, function (error) {
+                            console.error(error);
+                        });
+                    }
+                });
+            });
+
+                    // 버튼 클릭 시 텍스트 변경
+            languageToggleButton.addEventListener('click', function() {
+                if (isKorean) {
+                    // 한국어에서 영어로 변경
+                    languageToggleButton.textContent = 'ⓐ';
+                    document.getElementById('customizeButton').textContent = 'Color 🎨';
+                    document.getElementById('saveButton').textContent = 'Save 💾';
+                    document.getElementById('imageButton').textContent = 'Image 🖼️';
+                    document.getElementById('resetButton').textContent = 'Reset 🔄';
+                    document.getElementById('loadButton').textContent = 'Load 📁';
+                    document.getElementById('draftsSaveButton').textContent ='drafts Save';
+                    document.getElementById('draftsLoadButton').textContent ='drafts Load';
+
+                    // 한글 스타일로 버튼 크기/위치 조정
+                    adjustButtonStyle('en');
+                } else {
+                    // 영어에서 한국어로 변경
+                    languageToggleButton.textContent = '㉠';
+                    document.getElementById('customizeButton').textContent = '맞춤 설정 🎨';
+                    document.getElementById('saveButton').textContent = '파일 저장 💾';
+                    document.getElementById('imageButton').textContent = '이미지 추가 🖼️';
+                    document.getElementById('resetButton').textContent = '리셋 🔄';
+                    document.getElementById('loadButton').textContent = '파일 로드 📁';
+                    document.getElementById('draftsSaveButton').textContent ='모델 임시저장';
+                    document.getElementById('draftsLoadButton').textContent ='모델 불러오기';
+                    // 한글 스타일로 버튼 크기/위치 조정
+                    adjustButtonStyle('kr');
+                }
+                // 상태 전환
+                isKorean = !isKorean;
+            });
+            function adjustButtonStyle(language) {
+                    const buttonStyleChanges = {
+                        'en': {
+                            'languageToggleButton': {
+                                'padding': '5px 8px',
+                                'left': '580px',
+                            },
+                            'customizeButton': {
+                                'padding': '5px 20px',
+                                'left': '20px',
+                            },
+                            'saveButton': {
+                                'padding': '5px 20px',
+                                'left': '130px',
+                            },
+                            'imageButton': {
+                                'padding': '5px 20px',
+                                'left': '240px',
+                            },
+                            'resetButton': {
+                                'padding': '5px 20px',
+                                'left': '360px',
+                            },
+                            'loadButton': {
+                                'padding': '5px 20px',
+                                'left': '475px',
+                            },
+                            'draftsSaveButton': {
+                                'padding':'5px 20px',
+                                'left': '630px',
+                            },
+                            'draftsLoadButton': {
+                                'padding': '5px 20px',
+                                'left': '760px',
+                            }
+                        },
+                        'kr': {
+                            'languageToggleButton': {
+                                'padding': '4.5px 8px',  // 한글은 텍스트가 길어지므로 패딩을 줄임
+                                'left': '700px',  // 위치 약간 오른쪽으로 이동
+                            },
+                            'customizeButton': {
+                                'padding': '5px 20px',
+                                'left': '20px',  // 한국어일 때 왼쪽 위치 조정
+                            },
+                            'saveButton': {
+                                'padding': '5px 20px',
+                                'left': '160px',
+                            },
+                            'imageButton': {
+                                'padding': '5px 20px',
+                                'left': '300px',
+                            },
+                            'resetButton': {
+                                'padding': '5px 20px',
+                                'left': '457px',
+                            },
+                            'loadButton': {
+                                'padding': '5px 20px',
+                                'left': '560px',
+                            },
+                            'draftsSaveButton' :{
+                                'padding': '5px 20px',
+                                'left': '750px',
+                            },
+                            'draftsLoadButton':{
+                                'padding': '5px 20px',
+                                'left': '900px',
+                            }
+                        }
+                    };
+
+                    const buttonStyles = buttonStyleChanges[language];
+
+                    // ⓐ 버튼(언어 전환 버튼)에 적용
+                    languageToggleButton.style.padding = buttonStyles.languageToggleButton.padding;
+                    languageToggleButton.style.left = buttonStyles.languageToggleButton.left;
+
+                    // 다른 버튼들의 스타일 적용
+                    document.getElementById('customizeButton').style.padding = buttonStyles.customizeButton.padding;
+                    document.getElementById('customizeButton').style.left = buttonStyles.customizeButton.left;
+
+                    document.getElementById('saveButton').style.padding = buttonStyles.saveButton.padding;
+                    document.getElementById('saveButton').style.left = buttonStyles.saveButton.left;
+
+                    document.getElementById('imageButton').style.padding = buttonStyles.imageButton.padding;
+                    document.getElementById('imageButton').style.left = buttonStyles.imageButton.left;
+
+                    document.getElementById('resetButton').style.padding = buttonStyles.resetButton.padding;
+                    document.getElementById('resetButton').style.left = buttonStyles.resetButton.left;
+
+                    document.getElementById('loadButton').style.padding = buttonStyles.loadButton.padding;
+                    document.getElementById('loadButton').style.left = buttonStyles.loadButton.left;
+
+                    document.getElementById('draftsSaveButton').style.padding =buttonStyles.draftsSaveButton.padding;
+                    document.getElementById('draftsSaveButton').style.left = buttonStyles.draftsSaveButton.left;
+
+                    document.getElementById('draftsLoadButton').style.padding =buttonStyles.draftsLoadButton.padding;
+                    document.getElementById('draftsLoadButton').style.left = buttonStyles.draftsLoadButton.left;
+                }
+            // 라디오 버튼 선택에 따른 모델 선택 변경
+            document.querySelectorAll('input[name="modelSelect"]').forEach((radio) => {
+                radio.addEventListener('change', function(event) {
+                    selectedModel = event.target.value;  // 선택된 모델 업데이트
+                });
+            });
+            
+
+            function onWindowResize() {
+                // 카메라와 렌더러 크기 업데이트
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+
+                // 모델 크기 비율에 맞게 조정
+                const scaleFactor = window.innerWidth / window.innerHeight;  // 화면 비율을 기준으로 모델 크기 변경
+
+                if (model) {
+                    model.scale.set(scaleFactor * 6, scaleFactor * 6, scaleFactor * 6); // 모델 크기 조정
+                }
+                if (model2) {
+                    model2.scale.set(scaleFactor * 6, scaleFactor * 6, scaleFactor * 6); // 모델 크기 조정
+                }
+            }
+
+
+            function init() {
+                scene = new THREE.Scene();
+                const textureLoader = new THREE.TextureLoader();
+                const backgroundTexture = textureLoader.load('bg2.jpg');
+                scene.background = backgroundTexture;
+
+
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(0, 0, 4);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+
+                const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+                light.position.set(0, 20, 0);
+                scene.add(light);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff);
+                directionalLight.position.set(0, 20, 10);
+                scene.add(directionalLight);
+
+                // 첫 번째 모델 로드
+                const loader = new THREE.GLTFLoader();
+                loader.load('t_shirt/scene2.glb', function (gltf) {
+                    model = gltf.scene;
+                    model.scale.set(6, 6, 6);
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    model.position.x = -2.5;
+                    model.position.y = 0;
+                    scene.add(model);
+                }, undefined, function (error) {
+                    console.error(error);
+                });
+                // 두 번째 모델 로드
+                const loader2 = new THREE.GLTFLoader();
+                loader.load('t_shirt/scene4.glb', function (gltf) {
+                    model2 = gltf.scene;
+                    model2.scale.set(6, 6, 6);
+                    const box = new THREE.Box3().setFromObject(model2);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model2.position.sub(center); 
+                    model2.position.x = 2.5;
+                    model2.position.y = 0;
+                    model2.position.z = 0; // 모델의 z축 위치 기본값으로 유지해야함!
+                    model2.rotation.y = Math.PI; // !!!y축 기준으로 180도 회전시켜서 뒷면 보이게함!!!
+                    scene.add(model2);
+                }, undefined, function (error) {
+                    console.error(error);
+                });
+
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableRotate = false;  // 카메라 회전 금지
+                controls.enableZoom = false;    // 줌 금지
+                controls.enablePan = false;     // 팬(이동) 금지
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.25;
+                controls.screenSpacePanning = false;
+                controls.maxPolarAngle = Math.PI / 2;
+                window.addEventListener('resize', onWindowResize, false);
+            }
+
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+
+                // 마우스에 따라 선택된 모델 회전
+                const targetModel = selectedModel === 'model1' ? model : model2;
+                if (targetModel) {
+                    if (selectedModel === 'model2') {
+                        targetModel.rotation.y = Math.PI + (mouseX * Math.PI / 10); //y축
+                        targetModel.rotation.x = -mouseY * Math.PI / 10; //x축
+                    } else {
+                        targetModel.rotation.y = mouseX * Math.PI / 10;  // Y축 회전
+                        targetModel.rotation.x = -mouseY * Math.PI / 10; // X축 회전
+                    }
+                }
+                controls.update();
+                renderer.render(scene, camera);
+            }
+    document.getElementById('draftsSaveButton').addEventListener('click', function() {
+        savedModelState = {
+            model1: {
+                color: model ? getModelColor(model) : null,
+                texture: currentTexture1,
+                material: model ? getModelMaterial(model) : null // 재질 추가
+            },
+            model2: {
+                color: model2 ? getModelColor(model2) : null,
+                texture: currentTexture2,
+                material: model2 ? getModelMaterial(model2) : null // 재질 추가
+            }
+        };
+        alert("모델 상태가 임시 저장되었습니다.");
+    });
+
+    document.getElementById('draftsLoadButton').addEventListener('click', function() {
+        if (savedModelState && (savedModelState.model1.color || savedModelState.model2.color)) {
+            applyModelState(savedModelState);
+            alert("임시 저장된 모델 상태가 적용되었습니다.");
+        } else {
+            alert("임시 저장된 상태가 없습니다.");
+        }
+    });
+
+    // 모델의 색상 정보를 가져오는 함수
+    function getModelColor(targetModel) {
+        let color = null;
+        targetModel.traverse(function(child) {
+            if (child.isMesh && child.material) {
+                color = child.material.color.getStyle();
+            }
+        });
+        return color;
+    }
+    function getModelMaterial(targetModel) {
+        let material = null;
+        targetModel.traverse(function(child) {
+            if (child.isMesh && child.material) {
+                material = {
+                    roughness: child.material.roughness,
+                    metalness: child.material.metalness
+                };
+            }
+        });
+        return material;
+    }
+
+    function applyModelState(state) {
+        // !!!!!!!! model1 적용 !!!!!!!!
+        if (state.model1.color && model) {
+            model.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    child.material.color.setStyle(state.model1.color);
+                    child.material.needsUpdate = true;
+                }
+            });
+        }
+        if (state.model1.texture && model) {
+            applyTextureToModel(model, state.model1.texture);
+        }
+        if (state.model1.material && model) {
+            applyMaterialToModel(model, state.model1.material);
+        }
+
+        // !!!!!!!! model2 적용 !!!!!!!!
+        if (state.model2.color && model2) {
+            model2.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    child.material.color.setStyle(state.model2.color);
+                    child.material.needsUpdate = true;
+                }
+            });
+        }
+        if (state.model2.texture && model2) {
+            applyTextureToModel(model2, state.model2.texture);
+        }
+        if (state.model2.material && model2) {
+            applyMaterialToModel(model2, state.model2.material);
+        }
+    }
+
+    function applyTextureToModel(targetModel, texture) {
+        const newTexture = texture.clone();
+        targetModel.traverse(function(child) {
+            if (child.isMesh && child.material) {
+                const newMaterial = new THREE.MeshStandardMaterial({
+                    map: newTexture,
+                    color: child.material.color,
+                    roughness: child.material.roughness,
+                    metalness: child.material.metalness,
+                });
+                child.material = newMaterial;
+                child.material.needsUpdate = true;
+            }
+        });
+    }
+    function applyMaterialToModel(targetModel, material) {
+        targetModel.traverse(function(child) {
+            if (child.isMesh && child.material) {
+                child.material.roughness = material.roughness;
+                child.material.metalness = material.metalness;
+                child.material.needsUpdate = true;
+            }
+        });
+    }
+
+
+            init();
+            animate();
+
+            // 마우스 이동 이벤트 리스너
+            document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+            function onDocumentMouseMove(event) {
+                // 마우스 위치를 캡처 (중앙을 기준으로 X, Y 좌표 계산)
+                mouseX = (event.clientX - windowHalfX) / windowHalfX;
+                mouseY = (event.clientY - windowHalfY) / windowHalfY;
+            }
+
+            moveButtonControl.addEventListener('mousedown', function(event) {
+            isDragging = true;
+
+                // 드래그 시작 시 현재 오프셋 저장
+                if (currentTexture1) {
+                    initialOffset.x = currentTexture1.offset.x;
+                    initialOffset.y = currentTexture1.offset.y;
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            function onMouseMove(event) {
+                if (isDragging) {
+                    const moveControlsRect = moveControls.getBoundingClientRect();
+                    const x = event.clientX - moveControlsRect.left - moveButtonControl.clientWidth / 2;
+                    const y = event.clientY - moveControlsRect.top - moveButtonControl.clientHeight / 2;
+
+                    // 버튼 위치 제한
+                    moveButtonControl.style.left = Math.max(0, Math.min(moveControlsRect.width - moveButtonControl.clientWidth, x)) + 'px';
+                    moveButtonControl.style.top = Math.max(0, Math.min(moveControlsRect.height - moveButtonControl.clientHeight, y)) + 'px';
+
+                    const centerX = moveControlsRect.width / 2;
+                    const centerY = moveControlsRect.height / 2;
+
+                    // 여기를 수정하여 좌우와 상하를 뒤집음
+                    const offsetX = (centerX - x) / centerX; // X축 반전
+                    const offsetY = (centerY - y) / centerY; // Y축 반전
+
+                    // 두 모델의 오프셋을 동시에 업데이트
+                    if (currentTexture1) {
+                        currentTexture1.offset.x = initialOffset.x + offsetX * 0.5; // 스케일 조정
+                        currentTexture1.offset.y = initialOffset.y + offsetY * 0.5; // 스케일 조정
+                        currentTexture1.needsUpdate = true;
+                    }
+
+                    if (currentTexture2) {
+                        currentTexture2.offset.x = initialOffset.x + offsetX * 0.5; // 스케일 조정
+                        currentTexture2.offset.y = initialOffset.y + offsetY * 0.5; // 스케일 조정
+                        currentTexture2.needsUpdate = true;
+                    }
+                }
+            }
+
+            function onMouseUp() {
+                isDragging = false;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                // 드래그를 멈추면 버튼을 원래 위치로 복원
+                moveButtonControl.style.left = '60px'; // 초기 위치로 설정
+                moveButtonControl.style.top = '60px';  // 초기 위치로 설정
+
+                // 버튼 색상 복원
+                moveButtonControl.style.backgroundColor = '#007BFF';
+            }
+
+
+
+        </script>
+    </body>
+    </html>
